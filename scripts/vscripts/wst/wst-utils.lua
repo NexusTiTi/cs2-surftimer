@@ -91,3 +91,19 @@ function GetPlayerByUserId(userId)
     end
     return chatPlayer
 end
+
+-- Returns the hit position of a trace along a normalized direction vector.
+function TraceDir(orig, dir, maxd, filter)
+    local value = {
+        startpos = orig,
+        endpos = orig+dir*maxd,
+        ignore = filter
+    }
+    if TraceLine(value) == true then
+        if value.hit == false then
+            return false
+        end
+
+        return value.pos
+    end
+end

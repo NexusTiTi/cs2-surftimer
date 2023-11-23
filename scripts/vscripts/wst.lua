@@ -191,12 +191,9 @@ end
 
 -- local zones = LoadKeyValues('scripts/wst_zones/surf_beginner_debug.txt')
 local zones = LoadKeyValues('scripts/wst_zones/' .. CURRENT_MAP .. '.txt')
-if zones == nil then
-    print("Failed to load WST, there is no zone file for this map: " .. CURRENT_MAP)
-    return
+if not (zones == nil) then
+    LoadZones(zones)
 end
-
-LoadZones(zones)
 
 -- !version
 function CommandVersion(player, SendText)
@@ -308,6 +305,14 @@ function CommandLegs(player, SendText)
     SendText(player, "Legs toggled")
 end
 
+-- !traceeye
+function CommandTraceEye(player, SendText)
+    local hit = TraceDir(player:EyePosition(), player:EyeAngles():Forward(), 2000.0, player)
+    if hit then
+        SendText(player, hit.x .. ", " .. hit.y .. ", " .. hit.z)
+    end
+end
+
 WST_COMMANDS = {
     ["version"] = {
         console = CommandVersion,
@@ -378,6 +383,11 @@ WST_COMMANDS = {
         console = nil,
         chat = CommandChatHelp,
         help = "Shows the help menu"
+    },
+    ["traceeye"] = {
+        console = CommandTraceEye,
+        chat = CommandTraceEye,
+        help = "Shows the x, y, z location where you are looking (for zoning maps)"
     }
 }
 
@@ -397,7 +407,8 @@ WST_COMMAND_ORDER = {
     "showhud",
     --    "version",
     "getpos",
-    "help"
+    "help",
+    "traceeye"
 }
 
 function GetLongestCommandNameLength()
