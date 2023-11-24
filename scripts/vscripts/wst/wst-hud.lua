@@ -16,7 +16,7 @@ end
 
 
 local function getRankHtml(player)
-    local position, total_players, time = getPlayerPosition(player.steam_id)
+    local position, total_players, time = getPlayerPosition(player.steam_id, player.track)
     local positionStr = position or "-"
     local totalPlayersStr = total_players or "-"
     local prStr = getPr(time) or ""

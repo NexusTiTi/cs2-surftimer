@@ -141,6 +141,43 @@ surf_beginner example:
 }
 ```
 
+## Update to 1.4
+
+Records file need to be modified
+Version now needs to be "_1.4" and "data" converted to "Main"
+Hopefully this will do it automatically when finishing this branch
+
+OLD (< 1.4)
+```
+"mg_nxr_course_v2"
+{
+	"version"		"_1.0"
+	"data"
+	{
+		"[U:1:59294850]"
+		{
+			"time"		"42.343750"
+			"name"		"TiTi"
+		}
+	}
+}
+```
+
+NEW (1.4)
+```
+"mg_nxr_course_v2"
+{
+	"version"		"_1.4"
+	"Main"
+	{
+		"[U:1:59294850]"
+		{
+			"time"		"42.343750"
+			"name"		"TiTi"
+		}
+	}
+}
+```
 
 ## Future of this plugin
 
