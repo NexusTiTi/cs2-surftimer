@@ -60,7 +60,6 @@ function StartZone_OnStartTouch(a, b)
         return
     end
 
-    print('Player entered start zone.')
     -- Not in prac when they enter the start zone
     if player.prac == true then
         player.prac = false
@@ -77,7 +76,6 @@ function BonusStartZone_OnStartTouch(a, b)
         return
     end
 
-    print('Player entered start zone.')
     -- Not in prac when they enter the start zone
     if player.prac == true then
         player.prac = false
@@ -279,7 +277,7 @@ function CommandTop(player, SendText)
 
     for i, p in ipairs(topPlayers)
     do
-        local position, total_players = getPlayerPosition(p.steam_id, p.track)
+        local position, total_players = getPlayerPosition(p.steam_id, Track.Main)
         SendText(player, position .. " " .. p.name .. " " .. FormatTime(p.time))
     end
 end
@@ -314,7 +312,7 @@ function CommandBTop(player, SendText)
 
     for i, p in ipairs(topPlayers)
     do
-        local position, total_players = getPlayerPosition(p.steam_id, p.track)
+        local position, total_players = getPlayerPosition(p.steam_id, Track.Bonus)
         SendText(player, position .. " " .. p.name .. " " .. FormatTime(p.time))
     end
 end
