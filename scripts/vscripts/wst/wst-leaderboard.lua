@@ -1,11 +1,13 @@
 -- Table to store players
 local current_map = GetMapName()
 
-local vdfLeaderboard = LoadKeyValues('scripts/wst_records/' .. current_map .. '.txt')
+local vdfLeaderboard = nil
 local leaderboard = {}
 local leaderboardOrder = {}
 local leaderboardOrderIdxBySteamId = {}
 local leaderboardSize = {}
+
+RELOAD_LEADERBOARD = false
 
 for track in pairs(Track) do
     leaderboard[track] = {}
@@ -14,33 +16,47 @@ for track in pairs(Track) do
     leaderboardSize[track] = {}
 end
 
-if vdfLeaderboard ~= nil then
-    print('Leaderboard loaded from disk')
-    print('Leaderboard Version: ', vdfLeaderboard.version)
-
-    if vdfLeaderboard.version ~= '_1.4' then
-        print('Leaderboard version is not 1.4, ignoring')
-        return
-    end
-
-    for key, track in pairs(Track) do
-        if vdfLeaderboard[track] ~= nil then
-            local data = vdfLeaderboard[track]
-            for key, value in pairs(data) do
-                local entry = {
-                    name = value.name,
-                    time = value.time,
-                }
-                leaderboard[track][key] = entry
-
-                table.insert(leaderboardOrder[track], key)
+function loadLeaderboard()
+    vdfLeaderboard = LoadKeyValues('scripts/wst_records/' .. current_map .. '.txt')
+    if vdfLeaderboard ~= nil then
+        RELOAD_LEADERBOARD = false
+        print('Leaderboard loaded from disk')
+        print('Leaderboard Version: ', vdfLeaderboard.version)
+    
+        -- If version 1.0 is detected, send update command and reload on next Activate
+        if vdfLeaderboard.version == '_1.0' then
+            print('Old leaderboard version, migrating to _1.4 !')
+            SendToServerConsole('wst_mm_update_records ' .. current_map)
+            RELOAD_LEADERBOARD = true
+            return
+        end
+    
+        if vdfLeaderboard.version ~= '_1.4' then
+            print('Leaderboard version is not 1.4, ignoring')
+            return
+        end
+    
+        for key, track in pairs(Track) do
+            if vdfLeaderboard[track] ~= nil then
+                local data = vdfLeaderboard[track]
+                for key, value in pairs(data) do
+                    local entry = {
+                        name = value.name,
+                        time = value.time,
+                    }
+                    leaderboard[track][key] = entry
+    
+                    table.insert(leaderboardOrder[track], key)
+                end
             end
         end
+    
+    else
+        print('Leaderboard not found, creating new one')
     end
-
-else
-    print('Leaderboard not found, creating new one')
 end
+
+loadLeaderboard()
 
 function sortLeaderboard()
     for key, track in pairs(Track) do
@@ -97,7 +113,7 @@ print('wst-leaderboard.lua loaded')
 
 -- Function to insert or update a player in the leaderboard
 function updateLeaderboard(player, time, track)
-    -- wst_mm_save_record surf_beginner "STEAM_0:1:123456789" main 50 "player name"
+    -- wst_mm_save_record surf_beginner "STEAM_0:1:123456789" Main 50 "player name"
     SendToServerConsole('wst_mm_save_record ' .. current_map .. ' "' ..
         player.steam_id .. '" ' .. track .. ' ' .. time .. ' "' .. player.name .. '"')
 

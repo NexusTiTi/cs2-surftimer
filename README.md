@@ -145,7 +145,7 @@ surf_beginner example:
 
 Records file need to be modified
 Version now needs to be "_1.4" and "data" converted to "Main"
-Hopefully this will do it automatically when finishing this branch
+This should be done automatically by lua when detecting version "_1.0"
 
 OLD (< 1.4)
 ```

@@ -680,6 +680,12 @@ function Activate()
 
     SurfCVars()
 
+    if RELOAD_LEADERBOARD == true then
+        print("[WST] Reload leaderboard requested")
+        loadLeaderboard()
+        sortLeaderboard()
+    end
+
     if WORLDENT ~= nil then
         WORLDENT:SetContextThink(nil, nil, 0)
     end
