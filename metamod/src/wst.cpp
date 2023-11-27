@@ -109,10 +109,10 @@ CON_COMMAND_F(wst_mm_update, "Updates the lua code and/or zones files from githu
 // Called by wst lua plugin to save records to disk
 // This should only be called by the sever console
 CON_COMMAND_F(wst_mm_save_record, "Save a record to disk", FCVAR_GAMEDLL | FCVAR_HIDDEN) {
-    // wst_mm_save_record <map_name> <steam_id> <time> <player name in quotes>
-    // wst_mm_save_record surf_beginner "STEAM_0:1:123456789" 50 "player name"
-    if (args.ArgC() != 5) {
-        Message("Usage: wst_mm_save_record <map_name> <steam_id> <time> <player name in quotes>\n");
+    // wst_mm_save_record <map_name> <steam_id> <track> <time> <player name in quotes>
+    // wst_mm_save_record surf_beginner "STEAM_0:1:123456789" Main 50 "player name"
+    if (args.ArgC() != 6) {
+        Message("Usage: wst_mm_save_record <map_name> <steam_id> <track> <time> <player name in quotes>\n");
         // print args
         for (int i = 0; i < args.ArgC(); i++) {
             Message("Arg %d: [%s]\n", i, args.Arg(i));
@@ -122,8 +122,9 @@ CON_COMMAND_F(wst_mm_save_record, "Save a record to disk", FCVAR_GAMEDLL | FCVAR
 
     const char *map_name = args.Arg(1);
     const char *steam_id = args.Arg(2);
-    float time = atof(args.Arg(3)); // Convert string to float
-    const char *player_name = args.Arg(4);
+    const char *track = args.Arg(3);
+    float time = atof(args.Arg(4)); // Convert string to float
+    const char *player_name = args.Arg(5);
 
     // Load or initialize our KeyValuesW
     KeyValues *kv = new KeyValues(map_name);
@@ -132,15 +133,14 @@ CON_COMMAND_F(wst_mm_save_record, "Save a record to disk", FCVAR_GAMEDLL | FCVAR
     char filePath[512];
     Q_snprintf(filePath, sizeof(filePath), "scripts/wst_records/%s.txt", map_name);
 
-
     KeyValues *data;
     if (kv->LoadFromFile(Framework::FileSystem(), filePath, "MOD")) {
         // Find the data subkey
-        data = kv->FindKey("data", true);
+        data = kv->FindKey(track, true);
     } else {
         // Initialize the KeyValues structure if the file doesn't exist
-        kv->SetString("version", "_1.0");
-        data = kv->FindKey("data", true); // Create "data" if it doesn't exist
+        kv->SetString("version", "_1.4");
+        data = kv->FindKey(track, true); // Create "data" if it doesn't exist
         DEBUG_Message("INITIALIZED NEW DATA STRUCTURE\n");
     }
 
@@ -154,21 +154,21 @@ CON_COMMAND_F(wst_mm_save_record, "Save a record to disk", FCVAR_GAMEDLL | FCVAR
         playerData->SetFloat("time", time);
         playerData->SetString("name", player_name);
         if (kv->SaveToFile(Framework::FileSystem(), filePath, "MOD")) {
-            Message("Record saved successfully for %s on %s [%f]\n", player_name, map_name, time);
+            Message("Record saved successfully for %s on [%s] %s [%f]\n", player_name, track, map_name, time);
         } else {
-            Message("Failed to save record for %s on %s [%f]\n", player_name, map_name, time);
+            Message("Failed to save record for %s on [%s] %s [%f]\n", player_name, track, map_name, time);
         }
     } else {
-        Message("Record not saved for %s on %s [%f] because it's not better than the existing record [%s]\n",
-                player_name, map_name, time, existingTimeStr);
+        Message("Record not saved for %s on [%s] %s [%f] because it's not better than the existing record [%s]\n",
+                player_name, track, map_name, time, existingTimeStr);
     }
 }
 
 CON_COMMAND_F(wst_mm_delete_top_records, "Delete the top N records for a map", FCVAR_GAMEDLL | FCVAR_HIDDEN) {
-    // wst_mm_delete_top_record <map_name> <number of records to delete>
-    // wst_mm_delete_top_record surf_beginner 5
-    if (args.ArgC() != 3) {
-        Message("Usage: wst_mm_delete_top_record <map_name> <number of records to delete>\n");
+    // wst_mm_delete_top_record <map_name> <track> <number of records to delete>
+    // wst_mm_delete_top_record surf_beginner Main 5
+    if (args.ArgC() != 4) {
+        Message("Usage: wst_mm_delete_top_record <map_name> <track> <number of records to delete>\n");
         // print args
         for (int i = 0; i < args.ArgC(); i++) {
             Message("Arg %d: [%s]\n", i, args.Arg(i));
@@ -177,7 +177,8 @@ CON_COMMAND_F(wst_mm_delete_top_records, "Delete the top N records for a map", F
     }
 
     const char *map_name = args.Arg(1);
-    int numRecordsToDelete = atoi(args.Arg(2));
+    const char *track = args.Arg(2);
+    int numRecordsToDelete = atoi(args.Arg(3));
 
     // Load or initialize our KeyValuesW
     KeyValues *kv = new KeyValues(map_name);
@@ -189,7 +190,7 @@ CON_COMMAND_F(wst_mm_delete_top_records, "Delete the top N records for a map", F
     KeyValues *data;
     if (kv->LoadFromFile(Framework::FileSystem(), filePath, "MOD")) {
         // Find the data subkey
-        data = kv->FindKey("data", true);
+        data = kv->FindKey(track, true);
     } else {
         Message("No records found for %s\n", map_name);
         return;
@@ -231,6 +232,48 @@ CON_COMMAND_F(wst_mm_delete_top_records, "Delete the top N records for a map", F
     }
 }
 
+// Should be automatically called by lua script when detecting version _1.0
+CON_COMMAND_F(wst_mm_update_records, "Update records file to version 1.4", FCVAR_GAMEDLL | FCVAR_HIDDEN) {
+    // wst_mm_update_records <map_name>
+    // wst_mm_update_records surf_beginner
+    if (args.ArgC() != 2) {
+        Message("Usage: wst_mm_update_records <map_name>\n");
+        // print args
+        for (int i = 0; i < args.ArgC(); i++) {
+            Message("Arg %d: [%s]\n", i, args.Arg(i));
+        }
+        return;
+    }
+
+    const char *map_name = args.Arg(1);
+
+    // Load or initialize our KeyValuesW
+    KeyValues *kv = new KeyValues(map_name);
+    KeyValues::AutoDelete autoDelete(kv); // Ensure automatic deletion on scope exit
+
+    char filePath[512];
+    Q_snprintf(filePath, sizeof(filePath), "scripts/wst_records/%s.txt", map_name);
+
+    if (kv->LoadFromFile(Framework::FileSystem(), filePath, "MOD")) {
+        // Find the data subkey
+        const char *version = kv->GetString("version", nullptr);
+        if (version != nullptr) {
+            kv->SetString("version", "_1.4");
+            kv->FindKey("data", true)->SetName("Main");
+        }
+    } else {
+        // Initialize the KeyValues structure if the file doesn't exist
+        kv->SetString("version", "_1.4");
+        kv->FindKey("Main", true); // Create "data" if it doesn't exist
+        DEBUG_Message("INITIALIZED NEW DATA STRUCTURE\n");
+    }
+
+    if (kv->SaveToFile(Framework::FileSystem(), filePath, "MOD")) {
+        Message("Records updated to 1.4 successfully for %s\n", map_name);
+    } else {
+        Message("Failed to update records for %s\n", map_name);
+    }
+}
 
 typedef void (*ClientPrint)(CBaseEntity *, int , const char *, ...);
 static ClientPrint ClientPrintFn = nullptr;
