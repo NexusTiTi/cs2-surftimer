@@ -97,8 +97,8 @@ File format:
 ```
 "Leaderboard"
 {
-    "version" "_1.0"
-    "data"
+    "version" "_1.4"
+    "Main"
     {
         "STEAM_0:1:123456"
         {
@@ -109,6 +109,19 @@ File format:
         {
             "name" "Player Two"
             "time" "120.00"
+        }
+    }
+    "Bonus"
+    {
+        "STEAM_0:1:123456"
+        {
+            "name" "Player One"
+            "time" "10.00"
+        }
+        "STEAM_0:0:654321"
+        {
+            "name" "Player Two"
+            "time" "20.00"
         }
     }
 }
