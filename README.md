@@ -97,8 +97,8 @@ File format:
 ```
 "Leaderboard"
 {
-    "version" "_1.0"
-    "data"
+    "version" "_1.4"
+    "Main"
     {
         "STEAM_0:1:123456"
         {
@@ -109,6 +109,19 @@ File format:
         {
             "name" "Player Two"
             "time" "120.00"
+        }
+    }
+    "Bonus"
+    {
+        "STEAM_0:1:123456"
+        {
+            "name" "Player One"
+            "time" "10.00"
+        }
+        "STEAM_0:0:654321"
+        {
+            "name" "Player Two"
+            "time" "20.00"
         }
     }
 }
@@ -141,6 +154,43 @@ surf_beginner example:
 }
 ```
 
+## Update to 1.4
+
+Records file need to be modified
+Version now needs to be "_1.4" and "data" converted to "Main"
+This should be done automatically by lua when detecting version "_1.0"
+
+OLD (< 1.4)
+```
+"mg_nxr_course_v2"
+{
+	"version"		"_1.0"
+	"data"
+	{
+		"[U:1:59294850]"
+		{
+			"time"		"42.343750"
+			"name"		"TiTi"
+		}
+	}
+}
+```
+
+NEW (1.4)
+```
+"mg_nxr_course_v2"
+{
+	"version"		"_1.4"
+	"Main"
+	{
+		"[U:1:59294850]"
+		{
+			"time"		"42.343750"
+			"name"		"TiTi"
+		}
+	}
+}
+```
 
 ## Future of this plugin
 

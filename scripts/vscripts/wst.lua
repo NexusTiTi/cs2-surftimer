@@ -3,8 +3,9 @@
 --          https://github.com/surftimer/SurfTimer script_trigger_multiple mechanism for making a timer
 --          https://github.com/Source2ZE/LuaUnlocker Lua Unlocker
 
-local CURRENT_VERSION = "_1.2.0"
+local CURRENT_VERSION = "_1.4.0"
 
+require("wst/wst-tracks")
 require("wst/wst-leaderboard")
 require("wst/wst-chat")
 require("wst/wst-cvars")
@@ -66,6 +67,23 @@ function StartZone_OnStartTouch(a, b)
 
     player.timer = nil
     player.is_in_start_zone = true
+    player.track = Track.Main
+end
+
+function BonusStartZone_OnStartTouch(a, b)
+    local player = b.activator
+    if player:IsAlive() == false then
+        return
+    end
+
+    -- Not in prac when they enter the start zone
+    if player.prac == true then
+        player.prac = false
+    end
+
+    player.timer = nil
+    player.is_in_start_zone = true
+    player.track = Track.Bonus
 end
 
 function StartZone_OnEndTouch(a, b)
@@ -87,15 +105,7 @@ function StartZone_OnEndTouch(a, b)
     player.is_in_start_zone = false
 end
 
-function EndZone_OnStartTouch(a, b)
-    local player = b.activator
-    if player:IsAlive() == false then
-        return
-    end
-    if player.timer == nil then
-        return
-    end
-
+function ProcessEndTime(player)
     local time = Time() - player.timer
     player.timer = nil
 
@@ -108,14 +118,17 @@ function EndZone_OnStartTouch(a, b)
     -- TODO: Seperate leaderboard stuff from chat stuff
 
     -- Leaderboard stuff
-    local wr = getWorldRecordTime()
-    local previousPosition, _, previousTime = getPlayerPosition(player.steam_id)
-    updateLeaderboard(player, time)
-    local position, total_players, _, tier = getPlayerPosition(player.steam_id)
+    local wr = getWorldRecordTime(player.track)
+    local previousPosition, _, previousTime = getPlayerPosition(player.steam_id, player.track)
+    updateLeaderboard(player, time, player.track)
+    local position, total_players, _, tier = getPlayerPosition(player.steam_id, player.track)
 
     -- Chat stuff 
     local tierColor = TIER_COLORS[tier]
     local tierString = " [" .. tierColor .. tier .. "<WHITE>]"
+
+    local trackColor = TRACK_COLORS[player.track]
+    local trackString = "<WHITE>[" .. trackColor .. player.track .. "<WHITE>] "
 
     local playerFinishMapMessage = "<GOLD>" ..
         player.name .. " <WHITE>finished in <GOLD>" .. FormatTime(time)
@@ -128,12 +141,12 @@ function EndZone_OnStartTouch(a, b)
             wrDiffString = " <WHITE>[WR<GREEN> -" .. FormatTime(wrDiff) .. "<WHITE>]"
         end
     end
-    ScriptPrintMessageChatAll(ConvertTextToColoredChatString(playerFinishMapMessage .. wrDiffString))
+    ScriptPrintMessageChatAll(ConvertTextToColoredChatString(trackString .. playerFinishMapMessage .. wrDiffString))
 
     if previousPosition == nil then
         local newPlayerMessage = "<GOLD>" ..
             player.name .. " <WHITE>is now rank <GOLD>" .. position .. "/" .. total_players .. tierString
-        ScriptPrintMessageChatAll(ConvertTextToColoredChatString(newPlayerMessage))
+        ScriptPrintMessageChatAll(ConvertTextToColoredChatString(trackString .. newPlayerMessage))
     elseif time < previousTime then
         local improvementTime = previousTime - time
 
@@ -142,14 +155,14 @@ function EndZone_OnStartTouch(a, b)
             " <WHITE>improved with [<GREEN>-" ..
             FormatTime(improvementTime) ..
             "<WHITE>] Rank <GOLD>" .. position .. "/" .. total_players .. tierString
-        ScriptPrintMessageChatAll(ConvertTextToColoredChatString(improvedPlayerMessage))
+        ScriptPrintMessageChatAll(ConvertTextToColoredChatString(trackString .. improvedPlayerMessage))
     else
         local worsePlayerMessage = "<GOLD>" ..
             player.name ..
             " <WHITE>missed their best time by [<RED>+" ..
             FormatTime(time - previousTime) ..
             "<WHITE>] Rank <GOLD>" .. position .. "/" .. total_players .. tierString
-        ScriptPrintMessageChatAll(ConvertTextToColoredChatString(worsePlayerMessage))
+        ScriptPrintMessageChatAll(ConvertTextToColoredChatString(trackString .. worsePlayerMessage))
     end
 
     local noPreviousRecords = wr == nil
@@ -158,7 +171,7 @@ function EndZone_OnStartTouch(a, b)
     if noPreviousRecords or betPreviousWr then
         local newWRMessage = "<GOLD>" .. player.name .. " <WHITE>set a new <GOLD>WR <WHITE>with <GOLD>" ..
             FormatTime(time) .. "!"
-        ScriptPrintMessageChatAll(ConvertTextToColoredChatString(newWRMessage))
+        ScriptPrintMessageChatAll(ConvertTextToColoredChatString(trackString .. newWRMessage))
 
         -- FireGameEvent("cs_win_panel_round", {
         --     ["funfact_token"] = "<font class='fontSize-xl' color='#5BEB60'>" ..
@@ -170,13 +183,42 @@ function EndZone_OnStartTouch(a, b)
     end
 end
 
-function EndZone_OnEndTouch(a, b)
+function MainEndZone_OnStartTouch(a, b)
     local player = b.activator
     if player:IsAlive() == false then
         return
     end
+    if player.timer == nil then
+        return
+    end
+    if player.track ~= Track.Main then
+        return
+    end
+    ProcessEndTime(player)
+end
 
-    player.timer = nil
+function BonusEndZone_OnStartTouch(a, b)
+    local player = b.activator
+    if player:IsAlive() == false then
+        return
+    end
+    if player.timer == nil then
+        return
+    end
+    if player.track ~= Track.Bonus then
+        return
+    end
+    ProcessEndTime(player)
+end
+
+function EndZone_OnEndTouch(a, b)
+    -- Do nothing ?
+    -- local player = b.activator
+    -- if player:IsAlive() == false then
+    --    return
+    -- end
+
+    -- player.timer = nil
 end
 
 function LoadZones(zone_file_table)
@@ -186,6 +228,12 @@ function LoadZones(zone_file_table)
     END_ZONE = CreateZoneFromFile('end', zone_file_table.data['end'])
     if zone_file_table.data['end2'] ~= nil then
         END_ZONE_2 = CreateZoneFromFile('end2', zone_file_table.data['end2'])
+    end
+    if zone_file_table.data['bonus_start'] ~= nil then
+        BONUS_START_ZONE = CreateZoneFromFile('bonus_start', zone_file_table.data['bonus_start'])
+    end
+    if zone_file_table.data['bonus_end'] ~= nil then
+        BONUS_END_ZONE = CreateZoneFromFile('bonus_end', zone_file_table.data['bonus_end'])
     end
 end
 
@@ -211,23 +259,32 @@ end
 
 -- !r
 function CommandR(player, SendText)
-    TeleportToStartZone(player)
+    if player.track ~= nil then
+        TeleportToStartZone(player, player.track)
+    else
+        TeleportToStartZone(player, Track.Main)
+    end
+end
+
+-- !m
+function CommandM(player, SendText)
+    TeleportToStartZone(player, Track.Main)
 end
 
 -- !top
 function CommandTop(player, SendText)
-    local topPlayers = getTopPlayers(10)
+    local topPlayers = getTopPlayers(10, Track.Main)
 
     for i, p in ipairs(topPlayers)
     do
-        local position, total_players = getPlayerPosition(p.steam_id)
+        local position, total_players = getPlayerPosition(p.steam_id, Track.Main)
         SendText(player, position .. " " .. p.name .. " " .. FormatTime(p.time))
     end
 end
 
 -- !wr
 function CommandWr(player, SendText)
-    local wrTime = getTopPlayers(1)[1]
+    local wrTime = getTopPlayers(1, Track.Main)[1]
     if wrTime ~= nil then
         SendText(player, "Server record " .. FormatTime(wrTime.time) .. " by " .. wrTime.name)
     else
@@ -237,7 +294,42 @@ end
 
 -- !pr
 function CommandPr(player, SendText)
-    local previousPosition, _, previousTime = getPlayerPosition(player.steam_id)
+    local previousPosition, _, previousTime = getPlayerPosition(player.steam_id, Track.Main)
+    if previousPosition == nil then
+        SendText(player, "You have no record on this map!")
+    else
+        SendText(player, "Your personal record was " .. FormatTime(previousTime))
+    end
+end
+
+-- !b
+function CommandB(player, SendText)
+    TeleportToStartZone(player, Track.Bonus)
+end
+-- !btop
+function CommandBTop(player, SendText)
+    local topPlayers = getTopPlayers(10, Track.Bonus)
+
+    for i, p in ipairs(topPlayers)
+    do
+        local position, total_players = getPlayerPosition(p.steam_id, Track.Bonus)
+        SendText(player, position .. " " .. p.name .. " " .. FormatTime(p.time))
+    end
+end
+
+-- !bwr
+function CommandBWr(player, SendText)
+    local wrTime = getTopPlayers(1, Track.Bonus)[1]
+    if wrTime ~= nil then
+        SendText(player, "Server record " .. FormatTime(wrTime.time) .. " by " .. wrTime.name)
+    else
+        SendText(player, "No server record set yet!")
+    end
+end
+
+-- !bpr
+function CommandBPr(player, SendText)
+    local previousPosition, _, previousTime = getPlayerPosition(player.steam_id, Track.Main)
     if previousPosition == nil then
         SendText(player, "You have no record on this map!")
     else
@@ -322,7 +414,12 @@ WST_COMMANDS = {
     ["r"] = {
         console = CommandR,
         chat = CommandR,
-        help = "Teleport to the start zone"
+        help = "Teleport to the start zone of your current track"
+    },
+    ["m"] = {
+        console = CommandM,
+        chat = CommandM,
+        help = "Teleport to the main start zone"
     },
     ["top"] = {
         console = CommandTop,
@@ -343,6 +440,31 @@ WST_COMMANDS = {
         console = CommandPr,
         chat = CommandPr,
         help = "Show your personal record on this map"
+    },
+    ["b"] = {
+        console = CommandB,
+        chat = CommandB,
+        help = "Teleport to the bonus start zone"
+    },
+    ["btop"] = {
+        console = CommandBTop,
+        chat = CommandBTop,
+        help = "Show the top 10 players on this map (bonus)"
+    },
+    ["bwr"] = {
+        console = CommandBWr,
+        chat = CommandBWr,
+        help = "Show the server record (bonus)"
+    },
+    ["bsr"] = {
+        console = CommandBWr,
+        chat = CommandBWr,
+        help = "Show the server record (bonus)"
+    },
+    ["bpr"] = {
+        console = CommandBPr,
+        chat = CommandBPr,
+        help = "Show your personal record on this map (bonus)"
     },
     ["cp"] = {
         console = CommandCp,
@@ -385,10 +507,16 @@ WST_COMMANDS = {
 -- tables are not ordered unless they are array tables
 WST_COMMAND_ORDER = {
     "r",
+    "m",
     "top",
     "wr",
     "sr",
     "pr",
+    "b",
+    "btop",
+    "bwr",
+    "bsr",
+    "bpr",
     "cp",
     "tele",
     "spec",
@@ -453,10 +581,21 @@ for name, cmd in pairs(WST_COMMANDS) do
     end
 end
 
-
-function TeleportToStartZone(player)
-    player:SetAbsOrigin(START_ZONE.center)
-    player:SetVelocity(Vector(0, 0, 0))
+-- Setting track information here as teleporting player inside zone does not trigger StartTouch
+function TeleportToStartZone(player, track)
+    if track == Track.Main then
+        if START_ZONE ~= nil then
+            --player.track = track
+            player:SetAbsOrigin(START_ZONE.center)
+            player:SetVelocity(Vector(0, 0, 0))
+        end
+    elseif track == Track.Bonus then
+        if BONUS_START_ZONE ~= nil then
+            --player.track = track
+            player:SetAbsOrigin(BONUS_START_ZONE.center)
+            player:SetVelocity(Vector(0, 0, 0))
+        end
+    end
 end
 
 function ConvertTSpawnsToCTSpawns()
@@ -493,6 +632,10 @@ function PlayerTick(player)
     local velocity = player:GetVelocity()
     local speed = velocity:Length2D()
 
+    if player.track == nil then
+        player.track = Track.Main
+    end
+
     if player:IsAlive() == false then
         player.timer = nil
         player.is_in_start_zone = false
@@ -501,7 +644,7 @@ function PlayerTick(player)
 
     if player.is_in_start_zone == true then
         if speed > START_ZONE_SPEED_CAP_XY then
-            TeleportToStartZone(player)
+            TeleportToStartZone(player, player.track)
         end
     end
 
@@ -537,6 +680,12 @@ function Activate()
 
     SurfCVars()
 
+    if RELOAD_LEADERBOARD == true then
+        print("[WST] Reload leaderboard requested")
+        loadLeaderboard()
+        sortLeaderboard()
+    end
+
     if WORLDENT ~= nil then
         WORLDENT:SetContextThink(nil, nil, 0)
     end
@@ -552,11 +701,19 @@ function Activate()
 
     START_ZONE:init(StartZone_OnStartTouch, StartZone_OnEndTouch)
     START_ZONE:DrawZone("0 255 0")
-    END_ZONE:init(EndZone_OnStartTouch, EndZone_OnEndTouch)
+    END_ZONE:init(MainEndZone_OnStartTouch, EndZone_OnEndTouch)
     END_ZONE:DrawZone("255 0 0")
     if END_ZONE_2 ~= nil then
-        END_ZONE_2:init(EndZone_OnStartTouch, EndZone_OnEndTouch)
+        END_ZONE_2:init(MainEndZone_OnStartTouch, EndZone_OnEndTouch)
         END_ZONE:DrawZone("255 0 0")
+    end
+    if BONUS_START_ZONE ~= nil then
+        BONUS_START_ZONE:init(BonusStartZone_OnStartTouch, StartZone_OnEndTouch)
+        BONUS_START_ZONE:DrawZone("0 0 255")
+    end
+    if BONUS_END_ZONE ~= nil then
+        BONUS_END_ZONE:init(BonusEndZone_OnStartTouch, EndZone_OnEndTouch)
+        BONUS_END_ZONE:DrawZone("255 0 255")
     end
 
     TimerOnce(1, function()
@@ -633,7 +790,7 @@ function ServerMessageHelp()
 end
 
 function ServerMessageTop()
-    local wrTime = getTopPlayers(1)[1]
+    local wrTime = getTopPlayers(1, Track.Main)[1]
     if wrTime ~= nil then
         ScriptPrintMessageChatAll(ConvertTextToColoredChatString(
             "<GOLD>Server record <GREEN>" .. FormatTime(wrTime.time) .. "<GOLD> by <GREEN>" .. wrTime.name))

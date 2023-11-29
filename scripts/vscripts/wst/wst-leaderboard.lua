@@ -1,45 +1,79 @@
 -- Table to store players
 local current_map = GetMapName()
 
-local vdfLeaderboard = LoadKeyValues('scripts/wst_records/' .. current_map .. '.txt')
+local vdfLeaderboard = nil
 local leaderboard = {}
 local leaderboardOrder = {}
 local leaderboardOrderIdxBySteamId = {}
-local leaderboardSize = 0
+local leaderboardSize = {}
 
-if vdfLeaderboard ~= nil then
-    print('Leaderboard loaded from disk')
-    print('Leaderboard Version: ', vdfLeaderboard.version)
+RELOAD_LEADERBOARD = false
 
-    if vdfLeaderboard.version ~= '_1.0' then
-        print('Leaderboard version is not 1.0, ignoring')
-        return
-    end
-
-    local data = vdfLeaderboard.data
-    for key, value in pairs(data) do
-        local entry = {
-            name = value.name,
-            time = value.time
-        }
-        leaderboard[key] = entry
-
-        table.insert(leaderboardOrder, key)
-    end
-else
-    print('Leaderboard not found, creating new one')
+for track in pairs(Track) do
+    leaderboard[track] = {}
+    leaderboardOrder[track] = {}
+    leaderboardOrderIdxBySteamId[track] = {}
+    leaderboardSize[track] = {}
 end
 
-function sortLeaderboard()
-    table.sort(leaderboardOrder, function(a, b)
-        return tonumber(leaderboard[a].time) < tonumber(leaderboard[b].time)
-    end)
-    local count = 0
-    for i, steam_id in ipairs(leaderboardOrder) do
-        leaderboardOrderIdxBySteamId[steam_id] = i
-        count = count + 1
+function loadLeaderboard()
+    vdfLeaderboard = LoadKeyValues('scripts/wst_records/' .. current_map .. '.txt')
+    if vdfLeaderboard ~= nil then
+        RELOAD_LEADERBOARD = false
+        print('Leaderboard loaded from disk')
+        print('Leaderboard Version: ', vdfLeaderboard.version)
+    
+        -- If version 1.0 is detected, send update command and reload on next Activate
+        if vdfLeaderboard.version == '_1.0' then
+            print('Old leaderboard version, migrating to _1.4 !')
+            SendToServerConsole('wst_mm_update_records ' .. current_map)
+            RELOAD_LEADERBOARD = true
+            return
+        end
+    
+        if vdfLeaderboard.version ~= '_1.4' then
+            print('Leaderboard version is not 1.4, ignoring')
+            return
+        end
+    
+        for key, track in pairs(Track) do
+            if vdfLeaderboard[track] ~= nil then
+                local data = vdfLeaderboard[track]
+                for key, value in pairs(data) do
+                    local entry = {
+                        name = value.name,
+                        time = value.time,
+                    }
+                    leaderboard[track][key] = entry
+    
+                    table.insert(leaderboardOrder[track], key)
+                end
+            end
+        end
+    
+    else
+        print('Leaderboard not found, creating new one')
     end
-    leaderboardSize = count
+end
+
+loadLeaderboard()
+
+function sortLeaderboard()
+    for key, track in pairs(Track) do
+        if leaderboardOrder[track] ~= nil then
+            table.sort(leaderboardOrder[track], function(a, b)
+                return tonumber(leaderboard[track][a].time) < tonumber(leaderboard[track][b].time)
+            end)
+            local count = 0
+            for i, steam_id in ipairs(leaderboardOrder[track]) do
+                leaderboardOrderIdxBySteamId[track][steam_id] = i
+                count = count + 1
+            end
+            leaderboardSize[track] = count
+        else
+            leaderboardSize[track] = 0
+        end
+    end
 end
 
 sortLeaderboard()
@@ -78,13 +112,13 @@ print('-----------------')
 print('wst-leaderboard.lua loaded')
 
 -- Function to insert or update a player in the leaderboard
-function updateLeaderboard(player, time)
-    -- wst_mm_save_record surf_beginner "STEAM_0:1:123456789" 50 "player name"
+function updateLeaderboard(player, time, track)
+    -- wst_mm_save_record surf_beginner "STEAM_0:1:123456789" Main 50 "player name"
     SendToServerConsole('wst_mm_save_record ' .. current_map .. ' "' ..
-        player.steam_id .. '" ' .. time .. ' "' .. player.name .. '"')
+        player.steam_id .. '" ' .. track .. ' ' .. time .. ' "' .. player.name .. '"')
 
     -- Check if the player already exists and update their time
-    local leaderboardPlayer = leaderboard[player.steam_id]
+    local leaderboardPlayer = leaderboard[track][player.steam_id]
     if leaderboardPlayer ~= nil then
         if leaderboardPlayer.time > time then
             leaderboardPlayer.time = time
@@ -100,17 +134,17 @@ function updateLeaderboard(player, time)
         name = player.name,
         time = time,
     }
-    leaderboard[player.steam_id] = entry
-    table.insert(leaderboardOrder, player.steam_id)
+    leaderboard[track][player.steam_id] = entry
+    table.insert(leaderboardOrder[track], player.steam_id)
     sortLeaderboard()
 end
 
 -- Function to get a player's position
-function getPlayerPosition(steam_id)
-    local total_players = leaderboardSize
-    local leaderboardEntry = leaderboard[steam_id]
+function getPlayerPosition(steam_id, track)
+    local total_players = leaderboardSize[track]
+    local leaderboardEntry = leaderboard[track][steam_id]
     if leaderboardEntry ~= nil then
-        local position = leaderboardOrderIdxBySteamId[steam_id]
+        local position = leaderboardOrderIdxBySteamId[track][steam_id]
         local tier = determinePlayerTier(position, total_players)
         return position, total_players, leaderboardEntry.time, tier
     end
@@ -119,12 +153,12 @@ function getPlayerPosition(steam_id)
 end
 
 -- Function to get the top N players
-function getTopPlayers(n)
+function getTopPlayers(n, track)
     local topPlayers = {}
     for i = 1, n do
-        local steam_id = leaderboardOrder[i]
+        local steam_id = leaderboardOrder[track][i]
         if steam_id ~= nil then
-            local entry = leaderboard[steam_id]
+            local entry = leaderboard[track][steam_id]
             if entry ~= nil then
                 local player = {
                     steam_id = steam_id,
@@ -138,8 +172,8 @@ function getTopPlayers(n)
     return topPlayers
 end
 
-function getWorldRecordTime()
-    local topPlayers = getTopPlayers(1)
+function getWorldRecordTime(track)
+    local topPlayers = getTopPlayers(1, track)
     if topPlayers == nil then
         return nil
     end
